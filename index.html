@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xavier's Num Combiner</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Verdana, Geneva, Tahoma, sans-serif;
+        }
+        #add-num-input, #add-num-input-4 {
+            padding: 10px;
+        }
+        #num-inputs {
+            margin-top: 20px;
+            margin-bottom: 5px;
+        }
+        .num-input {
+            font-size: 25px;
+            width: 3em;
+            border-radius: 10px;
+            text-align: center;
+            padding-left: 10px;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+        #num-inputs {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+        }
+        .num-input-container {
+            display: flex;
+            align-items: center;
+            background-color: #FFF;
+            border-radius: 10px;
+            padding: 10px;
+            margin: 10px;
+            /* border: 2px solid black; */
+        }
+        #num-inputs input, #num-inputs button {
+            margin: 5px;
+        }
+        #go-btn {
+            font-size: 30px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+        #input-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #FFF;
+            border: 3px solid black;
+            border-radius: 20px;
+            margin: 20px;
+            padding: 20px;
+            margin-bottom: 0px;
+        }
+        #target-container {
+            margin: 20px;
+            margin-top: 5px;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #target-container input {
+            margin: 10px;
+            font-size: 30px;
+            width: 4em;
+            border-radius: 10px;
+            padding-left: 15px;
+            padding-top: 10px;
+            padding-bottom: 10px;
+        }
+        .status-div {
+            padding: 30px;
+            margin: 40px;
+            border-radius: 40px;
+            margin-top: 20px;
+        }
+        .status-answer {
+            background-color: #DFD;
+        }
+        .status-no-soln {
+            background-color: #F88;
+            text-align: center;
+            font-weight: bold;
+        }
+        .status-waiting {
+            background: rgb(77, 169, 255);
+            text-align: center;
+            color: #FFF;
+        }
+        .animate-disapear {
+            /* height: 0px; */
+            padding: 0px;
+            margin-top: 0px;
+            margin-bottom: 0px;
+            /* transform: scaleY(0); */
+            transition-property: height, padding, margin;
+            transition-duration: 0.6s;
+            transition-timing-function: ease;
+            overflow: hidden;
+        }
+        .animate-appear {
+            max-height: 0px;
+            transform: scaleY(0);
+            margin: 0px;
+            padding: 0px;
+            overflow: hidden;
+            transition-property: max-height, transform;
+            transition-duration: 0.5s;
+            transition-timing-function: ease;
+        }
+        .status-waiting span.waiting {
+            font-weight: bold;
+        }
+        h1 {
+            text-align: center;
+        }
+        body > p {
+            margin-left: 25px;
+            margin-right: 25px;
+        }
+    </style>
+
+    <script>
+        MathJax = {
+          tex: {
+            inlineMath: [['$$$', '$$$']],
+            processEscapes: true,
+          }
+        }
+      </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+    <h1>Xavier's Number Combiner Thing</h1>
+    <!-- For when you're on the train and a problem is bugging you... -->
+
+    <p>
+        I decided to make this thing where you can put in numbers and it'll find an expression
+        using those numbers to make another number. I haven't really though of a catchy name for this :(.
+
+        This was originally designed for a game played on Sydney public transport where the digits of the
+        ID code at the front of the carriage/bus is used to make the number 10. It also works well for the
+        <a href="https://en.wikipedia.org/wiki/Four_fours">four fours puzzle</a>, and the numbers round
+        of <a href="https://en.wikipedia.org/wiki/Letters_and_Numbers#Numbers_round">Letters and Numbers</a>
+        (or <a href="https://en.wikipedia.org/wiki/Countdown_(game_show)#Numbers_round">Countdown</a> in the UK).
+
+        On my machine with default settings it manages to process four and fewer numbers almost instantaneously.
+        For five numbers it usually takes a couple of seconds, and for six you'll be in for a good wait. Depending
+        on the settings, it may also be able to guarentee that no solution is possible given the operations
+        it's allowed to perform. This isn't fully finished yet, I've still got some ideas for this.
+    </p>
+
+    <p>
+        I was and still am quite surpsied at the what IMO is the nonintuitively high chance for target to be reached
+        using say 4 or 5 numbers, especially for somewhat larger targets. I find there's a certain
+        delight when it spits out an interesting/convoluted solution which manages to reach a difficult
+        goal.
+    </p>
+
+    <div id="input-panel">
+        <div id="num-inputs">
+            <button id="add-num-input">➕</button>
+            <button id="add-num-input-4">➕4</button>
+        </div>
+
+        <label id="target-container">
+            Target
+            <input value="10" id="target-number" type="number"></input>
+        </label>
+
+        <label>
+            Allow use of a number twice
+            <input type="checkbox" id="check-allow-dups"></input>
+        </label>
+        <label>
+            Require use of all numbers
+            <input type="checkbox" id="check-need-all" checked></input>
+        </label>
+        <label>
+            Allow the square root operation
+            <input type="checkbox" id="check-allow-sqrt" checked></input>
+        </label>
+        <label>
+            Allow the factorial operation
+            <input type="checkbox" id="check-allow-factorial" checked></input>
+        </label>
+        <label>
+            Allow the 'power of' operation
+            <input type="checkbox" id="check-allow-power" checked></input>
+        </label>
+        <label>
+            Allow the 'nth-root' operation
+            <input type="checkbox" id="check-allow-nth-root"></input>
+        </label>
+        <label>
+            Allow calculations to involve values which aren't integers
+            <input type="checkbox" id="check-allow-non-integer"></input>
+        </label>
+        <label>
+            Allow calculations to involve values which are negative
+            <input type="checkbox" id="check-allow-negative" checked></input>
+        </label>
+        <label>
+            Write multiplication using $$$ \times $$$
+            <input type="checkbox" id="check-multiply-with-x"></input>
+        </label>
+        <label title="Trivial in that the result of the operation is equal to the value of one of the arguments, so for example 5 + 0">
+            Allow 'trivial' operations (hover for explanation)
+            <input type="checkbox" id="check-allow-trivial" checked></input>
+        </label>
+
+        <br/>
+        <button id="go-btn">Go!</button>
+    </div>
+    <div id="answers"></div>
+
+    <script src="./thing.js"></script>
+</body>
+</html>
