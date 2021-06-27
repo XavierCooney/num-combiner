@@ -185,7 +185,10 @@
         on the settings, it may also be able to guarantee that no solution is possible given the operations
         it's allowed to perform.
 
-        <strong>This still isn't fully finished yet, I've still got some ideas for this and some changes to make.</strong>
+        <strong>
+            NEW: I've implemented most of the features that I could think of, but I've still got a few small ideas
+            left. If you've got any suggestions I'd be glad to here them.
+        </strong>
     </p>
 
     <p>
@@ -260,15 +263,18 @@
             Allow 'trivial' operations (hover for explanation)
             <input type="checkbox" id="check-allow-trivial" checked></input>
         </label>
-        <label>
+        <!-- <label>
             [Testing...] Sort stack before memoization
             <input type="checkbox" id="check-testing-sort"></input>
-        </label>
+        </label> -->
         <label>
             Find closest if can't find exact target
             <input type="checkbox" id="check-find-closest" checked></input>
         </label>
-
+        <label>
+            Try to find answers for all integers from 0 to target
+            <input type="checkbox" id="check-find-all"></input>
+        </label>
         <br/>
         <button id="go-btn">Go!</button>
     </div>

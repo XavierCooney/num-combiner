@@ -1,6 +1,19 @@
 // I really gotta figure out how to do TS modules without needing parcel.js or webpack,
 // this has turned into a mess again. Oh well...
 
+// TODO:
+//    - Optimise by arbitarily fixing operand order for order for commutative operators
+//    - Add some more exotic functions like gamma
+//    - Add some more presets? Maybe a four fours one?
+//    - Add settings for add+subtraction and multiplication+division too allow forcing of
+//      more interesting solutions (probably won't bother)
+//    - Make the - sign smarter about when it needs to wrap its arguments in latex
+//    - Add a way to try a bunch of different randomisation of the same presets, like
+//      find all but for the numbers themselves rather than the target (probably won't
+//      bother, and if I do it'll probably be just in code, no UI)
+//    - Improve UI (probably won't bother)
+//    - Improve representation of operations to be more performant (definitely won't bother)
+
 enum Determination {
     Correct, NeedMore, EndOfLine
 };
@@ -97,7 +110,7 @@ class NeededNumber implements Operation {
 }
 
 function is_close(a: number, b: number) {
-    return Math.abs(a - b) < 1e-7;
+    return Math.abs(a - b) < 1e-15;
 }
 
 function is_integer(a: number) {
@@ -115,8 +128,9 @@ enum SettingsOptions {
     multiply_with_x = 'multiply_with_x',
     allow_trivial = 'allow_trivial',
     allow_negative = 'allow_negative',
-    testing_sort = 'testing_sort',
-    find_closest = 'find_closest'
+    // testing_sort = 'testing_sort',
+    find_closest = 'find_closest',
+    find_all = 'find_all',
 };
 
 type Settings = {[key in SettingsOptions]: boolean};
@@ -128,9 +142,9 @@ function determine(operations: Operation[], target: number, number_needed: numbe
     const has_needed: boolean[] = new Array(number_needed).fill(false);
 
     function serialise_state() {
-        if(settings.testing_sort) {
-            stack.sort();
-        }
+        // if(settings.testing_sort) {
+        //     stack.sort();
+        // }
 
         return has_needed.join(',') + '|' + stack.join(',');
     }
@@ -176,10 +190,10 @@ function determine(operations: Operation[], target: number, number_needed: numbe
     } else if(stack.length < 1) {
         return [Determination.NeedMore, serialise_state()];
     } else {
-        if(is_close(stack[0], target)) {
+        if(is_close(stack[0], target) && !settings.find_all) {
             return [Determination.Correct, ''];
         } else {
-            return [Determination.NeedMore, WRONG_BUT_VALID_PREFIX + stack[0]];
+            return [Determination.NeedMore, WRONG_BUT_VALID_PREFIX + serialise_state()];
         }
     }
 }
@@ -203,31 +217,6 @@ function represent_as_string(operations: Operation[]): string {
     } else {
         return stack[0].wrap_if_needed(-1);
     }
-}
-
-declare var MathJax: any;
-function got_answer(answer: Operation[], target: number) {
-    clear_all_status();
-
-    compute_state = null;
-
-    const answer_div = document.createElement('div');
-    answer_div.classList.add('status-div');
-    answer_div.classList.add('status-answer');
-
-    answer_div.innerText = `$$ ${target} = ` + represent_as_string(answer) + ' $$';
-
-
-    const container = make_status_container();
-    container.appendChild(answer_div);
-
-    try {
-        MathJax.typesetPromise();
-    } catch {
-        // Fine, MathJax may not have loaded yet
-    }
-
-    slide_in(container);
 }
 
 function slide_away(el: HTMLElement) {
@@ -291,9 +280,32 @@ function clear_all_status() {
     });
 }
 
+declare var MathJax: any;
+function got_answer(answer: Operation[], target: number) {
+    clear_all_status();
+    compute_state = null;
+
+    const answer_div = document.createElement('div');
+    answer_div.classList.add('status-div');
+    answer_div.classList.add('status-answer');
+
+    answer_div.innerText = `$$ ${target} = ` + represent_as_string(answer) + ' $$';
+
+
+    const container = make_status_container();
+    container.appendChild(answer_div);
+
+    try {
+        MathJax.typesetPromise();
+    } catch {
+        // Fine, MathJax may not have loaded yet
+    }
+
+    slide_in(container);
+}
+
 function no_solution() {
     clear_all_status();
-
     compute_state = null;
 
     const answer_div = document.createElement('div');
@@ -308,7 +320,6 @@ function no_solution() {
 
 function no_solution_but_close(actual_target: number, result: number, operations: Operation[]) {
     clear_all_status();
-
     compute_state = null;
 
     const distance = Math.abs(actual_target - result);
@@ -332,6 +343,60 @@ function no_solution_but_close(actual_target: number, result: number, operations
     slide_in(container);
 }
 
+function got_find_all_answer(answers: Operation[][], target_up_to: number) {
+    compute_state = null;
+
+    const waiting_div = document.querySelector('.status-div.status-waiting');
+    if(waiting_div !== null) {
+        waiting_div.innerHTML = `
+            <p>
+                The system has finished processing, and is now rendering the results.
+                Please stand by, for large targets this can take some time.
+            </p>
+        `
+    } else {
+        console.log('No waiting div :(');
+    }
+
+    // Use settimeout to yield to browser so it can render the waiting message
+    setTimeout(() => {
+        clear_all_status();
+
+        for(let sub_target = 0; sub_target <= target_up_to; ++sub_target) {
+            const answer: undefined | Operation[] = answers[sub_target];
+
+            const answer_div = document.createElement('div');
+            answer_div.classList.add('status-div');
+
+            if(answer !== undefined) {
+                answer_div.classList.add('status-answer');
+                answer_div.innerText = `$$ ${sub_target} = ` + represent_as_string(answer) + ' $$';
+            } else {
+                answer_div.classList.add('status-no-soln');
+                answer_div.innerText = `No answer for $$$ ${sub_target} $$$ :(`;
+            }
+
+            const container = make_status_container();
+            container.appendChild(answer_div);
+
+            // Don't bother with the fancy CSS, it crashes the page when there's a big target
+            // try {
+            //     MathJax.typesetPromise();
+            // } catch {
+            //     // Fine, MathJax may not have loaded yet
+            // }
+            // slide_in(container);
+        }
+
+        try {
+            MathJax.typesetPromise();
+        } catch {
+            // Fine, MathJax may not have loaded yet
+        }
+
+    }, 500);
+}
+
 type ComputationState = null | {
     timeout_handle: number,
     attempts_made: number,
@@ -346,6 +411,7 @@ function go(target: number, allowed_numbers: number[], settings: Settings) {
     if(compute_state !== null) {
         clearTimeout(compute_state.timeout_handle);
     }
+
     compute_state = {
         timeout_handle: -1,
         attempts_made: 0,
@@ -354,6 +420,10 @@ function go(target: number, allowed_numbers: number[], settings: Settings) {
         countdown_to_next_update: 0
     };
 
+    const find_all_target_to_go_up_to = target;
+    if(settings.find_all) {
+        target = -1;
+    }
 
     let last_attempts: Operation[][] = [[]];
     let next_attempts: Operation[][] = [];
@@ -422,6 +492,8 @@ function go(target: number, allowed_numbers: number[], settings: Settings) {
 
     let closest_result: number | null = null;
     let closest_operation_array: Operation[] = [];
+    let find_all_answers: Operation[][] = []; // sparse
+    let find_all_answers_found: number = 0; // sparse
 
     function make_attempt() {
         if(done) return;
@@ -429,7 +501,9 @@ function go(target: number, allowed_numbers: number[], settings: Settings) {
         if(last_attempt_index === last_attempts.length) {
             if(next_attempts.length === 0) {
                 // Oh well
-                if(closest_result !== null) {
+                if(settings.find_all) {
+                    got_find_all_answer(find_all_answers, find_all_target_to_go_up_to);
+                } else if(closest_result !== null) {
                     no_solution_but_close(target, closest_result, closest_operation_array);
                 } else {
                     no_solution();
@@ -453,7 +527,7 @@ function go(target: number, allowed_numbers: number[], settings: Settings) {
 
             if(determination == Determination.EndOfLine) {
                 continue;
-            } else if(determination == Determination.Correct) {
+            } else if(determination == Determination.Correct && !settings.find_all) {
                 done = true;
                 const answer = copied;
                 console.log("answer", answer);
@@ -468,8 +542,26 @@ function go(target: number, allowed_numbers: number[], settings: Settings) {
                     seen_states[final_state] = 1;
                 }
 
-                if(settings.find_closest && final_state.startsWith(WRONG_BUT_VALID_PREFIX)) {
-                    const stripped = Number(final_state.replace(WRONG_BUT_VALID_PREFIX, ''));
+                const split_state = final_state.split('|');
+                const final_stack_state = split_state[split_state.length - 1];
+
+                if(settings.find_all && final_state.startsWith(WRONG_BUT_VALID_PREFIX)) {
+                    let stripped = Number(final_stack_state);
+
+                    if(!isNaN(stripped) && stripped >= 0 && stripped <= find_all_target_to_go_up_to && is_integer(stripped)) {
+                        stripped = Math.round(stripped);
+                        if(find_all_answers[stripped] === undefined) {
+                            find_all_answers[stripped] = copied;
+                            find_all_answers_found += 1;
+                        }
+                        if(find_all_answers_found == find_all_target_to_go_up_to + 1) {
+                            got_find_all_answer(find_all_answers, find_all_target_to_go_up_to);
+                            done = true;
+                            return;
+                        }
+                    }
+                } else if(settings.find_closest && final_state.startsWith(WRONG_BUT_VALID_PREFIX)) {
+                    const stripped = Number(final_stack_state);
                     const distance = Math.abs(target - stripped);
 
                     if(!isNaN(stripped) && (closest_result === null || distance < Math.abs(target - closest_result))) {
@@ -485,7 +577,7 @@ function go(target: number, allowed_numbers: number[], settings: Settings) {
         last_attempt_index += 1;
     }
 
-    const ATTEMPTS_PER_LOOP = 500;
+    const ATTEMPTS_PER_LOOP = settings.find_all ? 100 : 500;
 
     function do_loop() {
         make_attempt();
@@ -513,39 +605,49 @@ function go(target: number, allowed_numbers: number[], settings: Settings) {
                         </p>
                     `;
 
-                    if(settings.need_all) {
-                        waiting_div.innerHTML += `
-                            An expression length of at least <span class="waiting">${allowed_numbers.length * 2 - 1}</span> is needed for a solution
-                            using all numbers, but solutions which use operations like factorial
-                            and square root will be even longer.
-                        `;
-                    }
-
-                    if(settings.allow_sqrts && settings.allow_non_integers) {
-                        waiting_div.innerHTML += `
-                            <p> Because both square roots and non-integers are allowed, if
-                            no solution exists this process may continue indefinitely. </p>
-                        `;
-                    } else if(settings.allow_duplicate) {
+                    if(settings.find_all) {
                         waiting_div.innerHTML += `
                             <p>
-                                Because using numbers twice or more is allowed, if no solution
-                                exists this process may continue indefintiely.
+                                The system is trying to find answers for targets from <span class="waiting">0</span>
+                                to <span class="waiting">${find_all_target_to_go_up_to}</span> inclusive. This may
+                                take some time...
                             </p>
                         `;
                     } else {
-                        // I cant't think of any other unary operators which could be
-                        // chainged indefinitely or any other 0-arg functions. Please
-                        // tell me if there are any other cases. That is, unless no one
-                        // else is reading this. Well you clearly are (unless you're me),
-                        // because I am not 'anyone else'. But who and what is 'me'? In
-                        // this essay, I shall be exploring the metaphysics of personal
-                        // identity through a mereological...
-                        waiting_div.innerHTML += `
-                            <p>
-                                This process should either eventually find a solution${allowed_numbers.length > 5 ? ' (or run out of memory!)' : ''} or detect that one does not exists.
-                            </p>
-                        `;
+                        if(settings.need_all) {
+                            waiting_div.innerHTML += `
+                                An expression length of at least <span class="waiting">${allowed_numbers.length * 2 - 1}</span> is needed for a solution
+                                using all numbers, but solutions which use operations like factorial
+                                and square root will be even longer.
+                            `;
+                        }
+
+                        if(settings.allow_sqrts && settings.allow_non_integers) {
+                            waiting_div.innerHTML += `
+                                <p> Because both square roots and non-integers are allowed, if
+                                no solution exists this process may continue indefinitely. </p>
+                            `;
+                        } else if(settings.allow_duplicate) {
+                            waiting_div.innerHTML += `
+                                <p>
+                                    Because using numbers twice or more is allowed, if no solution
+                                    exists this process may continue indefintiely.
+                                </p>
+                            `;
+                        } else {
+                            // I cant't think of any other unary operators which could be
+                            // chainged indefinitely or any other 0-arg functions. Please
+                            // tell me if there are any other cases. That is, unless no one
+                            // else is reading this. Well you clearly are, unless you're me
+                            // because I am not 'anyone else'. But really who and what is
+                            // 'me'? In this essay, I shall be exploring the metaphysics of
+                            // personal identity by means of a mereological...
+                            waiting_div.innerHTML += `
+                                <p>
+                                    This process should either eventually find a solution${allowed_numbers.length > 5 ? ' (or run out of memory!)' : ''} or detect that one does not exists.
+                                </p>
+                            `;
+                        }
                     }
 
                     compute_state.waiting_stauts_box = waiting_div;
@@ -554,7 +656,7 @@ function go(target: number, allowed_numbers: number[], settings: Settings) {
                     slide_in(container);
                 }
             }
-            if(compute_state.waiting_stauts_box !== null) {
+            if(compute_state.waiting_stauts_box !== null && !done) {
                 if(compute_state.countdown_to_next_update <= 0) {
                     compute_state.countdown_to_next_update = 10;
 
@@ -563,7 +665,15 @@ function go(target: number, allowed_numbers: number[], settings: Settings) {
                     }
 
                     get_span('possiblities').innerText = compute_state.attempts_made.toLocaleString();
-                    get_span('length').innerText = next_attempts[0]?.length?.toLocaleString();
+                    if(next_attempts.length === 0) {
+                        if(last_attempts.length === 0) {
+                            get_span('length').innerText = '[no active states]';
+                        } else {
+                            get_span('length').innerText = last_attempts[0]?.length?.toLocaleString();
+                        }
+                    } else {
+                        get_span('length').innerText = next_attempts[0]?.length?.toLocaleString();
+                    }
                     get_span('total-states').innerText = (last_attempts.length + next_attempts.length).toLocaleString();
                 } else {
                     compute_state.countdown_to_next_update--;
@@ -623,8 +733,8 @@ const settings_to_checkbox_id: {[key in SettingsOptions]: string} = {
     multiply_with_x: 'check-multiply-with-x',
     allow_trivial: 'check-allow-trivial',
     allow_negative: 'check-allow-negative',
-    testing_sort: 'check-testing-sort',
-    find_closest: 'check-find-closest'
+    find_closest: 'check-find-closest',
+    find_all: 'check-find-all'
 }
 
 const COUNTDOWN_SETTINGS: Settings = {
@@ -638,8 +748,8 @@ const COUNTDOWN_SETTINGS: Settings = {
     multiply_with_x: false,
     allow_trivial: true,
     allow_negative: true, // I think???
-    testing_sort: false,
-    find_closest: true
+    find_closest: true,
+    find_all: false
 }
 
 const TRAIN_SETTINGS: Settings = {
@@ -653,8 +763,8 @@ const TRAIN_SETTINGS: Settings = {
     multiply_with_x: false,
     allow_trivial: true,
     allow_negative: true,
-    testing_sort: false,
-    find_closest: true
+    find_closest: true,
+    find_all: false
 }
 
 function set_settings_ui(settings: Settings) {
@@ -764,5 +874,21 @@ document.getElementById('go-btn')?.addEventListener('click', e => {
 
     const settings = get_settings_from_ui();
 
-    go(target, numbers_to_use, settings);
+    if(settings.find_all) {
+        // Ignore this case, as the user has probably deliberately
+        // selected find all, and also the find all results kind of
+        // already show the find closest results
+        settings.find_closest = false;
+    }
+
+    if(settings.find_all && settings.find_closest) {
+        // Unreachable, see a few liens above
+        alert("Cannot find all and find closest at the same time!");
+    } else if(settings.find_all && settings.allow_non_integers && settings.allow_sqrts) {
+        alert("Cannot find all and also allow square root as well as non-integers");
+    } else if(settings.find_all && settings.allow_duplicate) {
+        alert("Cannot find all and also allow use of a number more than once");
+    } else {
+        go(target, numbers_to_use, settings);
+    }
 });
