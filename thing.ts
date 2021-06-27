@@ -115,11 +115,13 @@ enum SettingsOptions {
     multiply_with_x = 'multiply_with_x',
     allow_trivial = 'allow_trivial',
     allow_negative = 'allow_negative',
-    testing_sort = 'testing_sort'
+    testing_sort = 'testing_sort',
+    find_closest = 'find_closest'
 };
 
 type Settings = {[key in SettingsOptions]: boolean};
 
+const WRONG_BUT_VALID_PREFIX = 'wrong_but_valid|';
 
 function determine(operations: Operation[], target: number, number_needed: number, settings: Settings): [Determination, string] {
     const stack: number[] = [];
@@ -177,7 +179,7 @@ function determine(operations: Operation[], target: number, number_needed: numbe
         if(is_close(stack[0], target)) {
             return [Determination.Correct, ''];
         } else {
-            return [Determination.NeedMore, serialise_state()];
+            return [Determination.NeedMore, WRONG_BUT_VALID_PREFIX + stack[0]];
         }
     }
 }
@@ -304,6 +306,32 @@ function no_solution() {
     slide_in(container);
 }
 
+function no_solution_but_close(actual_target: number, result: number, operations: Operation[]) {
+    clear_all_status();
+
+    compute_state = null;
+
+    const distance = Math.abs(actual_target - result);
+
+    const answer_div = document.createElement('div');
+    answer_div.classList.add('status-div');
+    answer_div.classList.add('status-no-soln');
+    answer_div.innerText = `No answer exists given the selected constraints...
+                            But there's still a way to get a finite distance of $$$ ${distance} $$$ close to the target! Hooray!
+                            $$ ${actual_target} \\approx ${result} = ${represent_as_string(operations)} $$`;
+
+    const container = make_status_container();
+    container.appendChild(answer_div);
+
+    try {
+        MathJax.typesetPromise();
+    } catch {
+        // Fine, MathJax may not have loaded yet
+    }
+
+    slide_in(container);
+}
+
 type ComputationState = null | {
     timeout_handle: number,
     attempts_made: number,
@@ -392,13 +420,20 @@ function go(target: number, allowed_numbers: number[], settings: Settings) {
     let done = false;
     let seen_states: {[state: string]: 1} = {};
 
+    let closest_result: number | null = null;
+    let closest_operation_array: Operation[] = [];
+
     function make_attempt() {
         if(done) return;
 
         if(last_attempt_index === last_attempts.length) {
             if(next_attempts.length === 0) {
                 // Oh well
-                no_solution();
+                if(closest_result !== null) {
+                    no_solution_but_close(target, closest_result, closest_operation_array);
+                } else {
+                    no_solution();
+                }
                 done = true;
                 return;
             }
@@ -431,6 +466,18 @@ function go(target: number, allowed_numbers: number[], settings: Settings) {
                 if(!seen_states[final_state]) {
                     next_attempts.push(copied);
                     seen_states[final_state] = 1;
+                }
+
+                if(settings.find_closest && final_state.startsWith(WRONG_BUT_VALID_PREFIX)) {
+                    const stripped = Number(final_state.replace(WRONG_BUT_VALID_PREFIX, ''));
+                    const distance = Math.abs(target - stripped);
+
+                    if(!isNaN(stripped) && (closest_result === null || distance < Math.abs(target - closest_result))) {
+                        if(closest_result !== null && is_close(distance, Math.abs(target - closest_result))) continue;
+
+                        closest_result = stripped;
+                        closest_operation_array = copied;
+                    }
                 }
             }
         }
@@ -577,6 +624,7 @@ const settings_to_checkbox_id: {[key in SettingsOptions]: string} = {
     allow_trivial: 'check-allow-trivial',
     allow_negative: 'check-allow-negative',
     testing_sort: 'check-testing-sort',
+    find_closest: 'check-find-closest'
 }
 
 const COUNTDOWN_SETTINGS: Settings = {
@@ -590,7 +638,8 @@ const COUNTDOWN_SETTINGS: Settings = {
     multiply_with_x: false,
     allow_trivial: true,
     allow_negative: true, // I think???
-    testing_sort: false
+    testing_sort: false,
+    find_closest: true
 }
 
 const TRAIN_SETTINGS: Settings = {
@@ -604,7 +653,8 @@ const TRAIN_SETTINGS: Settings = {
     multiply_with_x: false,
     allow_trivial: true,
     allow_negative: true,
-    testing_sort: false
+    testing_sort: false,
+    find_closest: true
 }
 
 function set_settings_ui(settings: Settings) {
