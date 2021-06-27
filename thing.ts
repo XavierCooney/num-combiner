@@ -104,18 +104,21 @@ function is_integer(a: number) {
     return is_close(a, Math.round(a));
 }
 
-type Settings = {
-    allow_duplicate: boolean,
-    need_all: boolean,
-    allow_sqrts: boolean,
-    allow_non_integers: boolean,
-    allow_factorial: boolean,
-    allow_power_of: boolean,
-    allow_nth_root: boolean,
-    multiply_with_x: boolean,
-    allow_trivial: boolean,
-    allow_negative: boolean
+enum SettingsOptions {
+    allow_duplicate = 'allow_duplicate',
+    need_all = 'need_all',
+    allow_sqrts = 'allow_sqrts',
+    allow_non_integers = 'allow_non_integers',
+    allow_factorial = 'allow_factorial',
+    allow_power_of = 'allow_power_of',
+    allow_nth_root = 'allow_nth_root',
+    multiply_with_x = 'multiply_with_x',
+    allow_trivial = 'allow_trivial',
+    allow_negative = 'allow_negative',
+    testing_sort = 'testing_sort'
 };
+
+type Settings = {[key in SettingsOptions]: boolean};
 
 
 function determine(operations: Operation[], target: number, number_needed: number, settings: Settings): [Determination, string] {
@@ -123,6 +126,10 @@ function determine(operations: Operation[], target: number, number_needed: numbe
     const has_needed: boolean[] = new Array(number_needed).fill(false);
 
     function serialise_state() {
+        if(settings.testing_sort) {
+            stack.sort();
+        }
+
         return has_needed.join(',') + '|' + stack.join(',');
     }
 
@@ -522,14 +529,14 @@ function go(target: number, allowed_numbers: number[], settings: Settings) {
     do_loop();
 }
 
-function add_extra_input() {
+function add_extra_input(value: number) {
     const new_div = document.createElement('div');
     new_div.classList.add('num-input-container');
 
     const input_element = document.createElement('input');
     input_element.classList.add('num-input');
     input_element.type = 'number';
-    input_element.value = `${Math.floor(Math.random() * 10)}`;
+    input_element.value = `${value}`;
     new_div.appendChild(input_element);
 
     const button_element = document.createElement('button');
@@ -543,38 +550,147 @@ function add_extra_input() {
     document.getElementById('num-inputs')?.insertBefore(new_div, document.getElementById('add-num-input'));
 }
 
-document.getElementById('add-num-input')?.addEventListener('click', e => {
-    add_extra_input();
-});
+function clear_inputs() {
+    const all_inputs = document.querySelectorAll('.num-input-container');
+    Array.prototype.forEach.call(all_inputs, (el) => {
+        el.remove();
+    });
+}
 
-document.getElementById('add-num-input-4')?.addEventListener('click', e => {
-    for(let i = 0; i < 4; ++i) {
-        add_extra_input();
-    }
+document.getElementById('add-num-input')?.addEventListener('click', e => {
+    add_extra_input(Math.floor(Math.random() * 10));
 });
 
 function read_checbox(checkbox_id: string) {
     return (<HTMLInputElement> document.getElementById(checkbox_id)).checked;
 }
 
-function get_settings_from_ui(): Settings {
-    return {
-        allow_duplicate: read_checbox('check-allow-dups'),
-        need_all: read_checbox('check-need-all'),
-        allow_sqrts: read_checbox('check-allow-sqrt'),
-        allow_non_integers: read_checbox('check-allow-non-integer'),
-        allow_factorial: read_checbox('check-allow-factorial'),
-        allow_power_of: read_checbox('check-allow-power'),
-        allow_nth_root: read_checbox('check-allow-nth-root'),
-        multiply_with_x: read_checbox('check-multiply-with-x'),
-        allow_trivial: read_checbox('check-allow-trivial'),
-        allow_negative: read_checbox('check-allow-negative')
-    };
+const settings_to_checkbox_id: {[key in SettingsOptions]: string} = {
+    allow_duplicate: 'check-allow-dups',
+    need_all: 'check-need-all',
+    allow_sqrts: 'check-allow-sqrt',
+    allow_non_integers: 'check-allow-non-integer',
+    allow_factorial: 'check-allow-factorial',
+    allow_power_of: 'check-allow-power',
+    allow_nth_root: 'check-allow-nth-root',
+    multiply_with_x: 'check-multiply-with-x',
+    allow_trivial: 'check-allow-trivial',
+    allow_negative: 'check-allow-negative',
+    testing_sort: 'check-testing-sort',
 }
+
+const COUNTDOWN_SETTINGS: Settings = {
+    allow_duplicate: false,
+    need_all: false,
+    allow_sqrts: false,
+    allow_factorial: false,
+    allow_non_integers: false,
+    allow_power_of: false,
+    allow_nth_root: false,
+    multiply_with_x: false,
+    allow_trivial: true,
+    allow_negative: true, // I think???
+    testing_sort: false
+}
+
+const TRAIN_SETTINGS: Settings = {
+    allow_duplicate: false,
+    need_all: true,
+    allow_sqrts: true,
+    allow_factorial: true,
+    allow_non_integers: false,
+    allow_power_of: true,
+    allow_nth_root: true,
+    multiply_with_x: false,
+    allow_trivial: true,
+    allow_negative: true,
+    testing_sort: false
+}
+
+function set_settings_ui(settings: Settings) {
+    let all_settings = <(keyof Settings)[]> Object.keys(SettingsOptions);
+
+    all_settings.forEach(setting_name => {
+        let checkbox = <HTMLInputElement> document.getElementById(settings_to_checkbox_id[setting_name]);
+        checkbox.checked = settings[setting_name];
+    });
+}
+
+function get_settings_from_ui(): Settings {
+    let all_settings = <(keyof Settings)[]> Object.keys(SettingsOptions);
+
+    // Ughhh https://stackoverflow.com/a/50396312/9510545
+    let setting_obj: any = {};
+    all_settings.map(setting_name => {
+        let checkbox = <HTMLInputElement> document.getElementById(settings_to_checkbox_id[setting_name]);
+
+        setting_obj[setting_name] = checkbox.checked;
+    });
+
+    return <Settings> setting_obj;
+}
+
+function set_target(value: number) {
+    (<HTMLInputElement> document.getElementById('target-number')).value = `${value}`;
+}
+
+document.getElementById('btn-countdown-preset')?.addEventListener('click', e => {
+    const selected_option = (<HTMLSelectElement> document.getElementById('countdown-nums-select')).selectedOptions[0];
+    let number_small = parseInt(selected_option.dataset.numSmall || '');
+    number_small = Math.max(2, Math.min(6, number_small));
+
+    let number_large = 6 - number_small;
+
+    const large_numbers: number[] = [];
+    while(number_large > 0) {
+        number_large--;
+
+        const possibilities_this_round = [25, 50, 75, 100];
+
+        large_numbers.forEach(x => {
+            let index = possibilities_this_round.indexOf(x);
+            if(index === -1) return;
+            possibilities_this_round.splice(index, 1);
+        });
+
+        if(possibilities_this_round.length == 0) continue;
+
+        large_numbers.push(possibilities_this_round[Math.floor(Math.random() * possibilities_this_round.length)]);
+    }
+
+    console.log(large_numbers);
+
+    const small_numbers = [];
+    while(number_small > 0) {
+        small_numbers.push(Math.floor(Math.random() * 10) + 1);
+        number_small--;
+    }
+
+    set_settings_ui(COUNTDOWN_SETTINGS);
+    clear_all_status();
+    clear_inputs();
+    small_numbers.forEach(number => add_extra_input(number));
+    large_numbers.forEach(number => add_extra_input(number));
+
+    set_target(Math.floor(Math.random() * 900 + 100));
+});
+
+document.getElementById('btn-4-preset')?.addEventListener('click', e => {
+    const numbers = [];
+    while(numbers.length < 4) {
+        numbers.push(Math.floor(Math.random() * 10));
+    }
+
+    set_settings_ui(TRAIN_SETTINGS);
+    clear_all_status();
+    clear_inputs();
+    numbers.forEach(number => add_extra_input(number));
+
+    set_target(10);
+});
 
 document.getElementById('go-btn')?.addEventListener('click', e => {
     clear_all_status();
-    // (<HTMLDivElement> document.getElementById('answers')).innerHTML = '';
 
     const all_input_num_els = document.querySelectorAll('.num-input');
 

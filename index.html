@@ -129,6 +129,31 @@
             margin-left: 25px;
             margin-right: 25px;
         }
+        #input-panel > hr {
+            margin-left: 0px;
+            margin-right: 0px;
+            align-self: stretch;
+            border-width: 3px;
+            margin-bottom: 25px;
+        }
+        #presets-panel button {
+            padding: 12px;
+            border-radius: 10px;
+        }
+        #countdown-container {
+            display: inline-block;
+            margin-left: 20px;
+            border: 2px solid black;
+            border-radius: 15px;
+            padding: 15px;
+        }
+        #countdown-nums-select {
+            padding: 8px;
+            border-radius: 10px;
+        }
+        #presets-panel {
+            margin-bottom: 20px;
+        }
     </style>
 
     <script>
@@ -157,28 +182,44 @@
 
         On my machine with default settings it manages to process four and fewer numbers almost instantaneously.
         For five numbers it usually takes a couple of seconds, and for six you'll be in for a good wait. Depending
-        on the settings, it may also be able to guarentee that no solution is possible given the operations
-        it's allowed to perform. This isn't fully finished yet, I've still got some ideas for this.
+        on the settings, it may also be able to guarantee that no solution is possible given the operations
+        it's allowed to perform.
+
+        <strong>This still isn't fully finished yet, I've still got some ideas for this and some changes to make.</strong>
     </p>
 
     <p>
-        I was and still am quite surpsied at the what IMO is the nonintuitively high chance for target to be reached
+        I was and still am quite surprised at the what IMO is the nonintuitively high chance for target to be reached
         using say 4 or 5 numbers, especially for somewhat larger targets. I find there's a certain
         delight when it spits out an interesting/convoluted solution which manages to reach a difficult
         goal.
     </p>
 
     <div id="input-panel">
+        <div id="presets-panel">
+            <button id="btn-4-preset">Four digits to get to 10</button>
+            <div id="countdown-container">
+                <select id="countdown-nums-select">
+                    <option data-num-small="6">6 small</option>
+                    <option data-num-small="5">5 small, 1 large</option>
+                    <option data-num-small="4" selected>4 small, 2 large</option>
+                    <option data-num-small="3">3 small, 3 large</option>
+                    <option data-num-small="2">2 small, 4 large</option>
+                </select>
+                <button id="btn-countdown-preset">Countdown/Letters and Numbers</button>
+            </div>
+        </div>
+        <hr/>
         <div id="num-inputs">
             <button id="add-num-input">➕</button>
-            <button id="add-num-input-4">➕4</button>
+            <!-- <button id="add-num-input-4">➕4</button> -->
         </div>
-
+        <hr/>
         <label id="target-container">
             Target
             <input value="10" id="target-number" type="number"></input>
         </label>
-
+        <hr/>
         <label>
             Allow use of a number twice
             <input type="checkbox" id="check-allow-dups"></input>
@@ -218,6 +259,10 @@
         <label title="Trivial in that the result of the operation is equal to the value of one of the arguments, so for example 5 + 0">
             Allow 'trivial' operations (hover for explanation)
             <input type="checkbox" id="check-allow-trivial" checked></input>
+        </label>
+        <label>
+            [Testing...] Sort stack before memoization
+            <input type="checkbox" id="check-testing-sort"></input>
         </label>
 
         <br/>
